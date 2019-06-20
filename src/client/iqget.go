@@ -126,8 +126,8 @@ func infoqCrawlerIndexList() {
 		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
 	}
 
-	fmt.Println("-------------------------------------theme_list--------------------------------------")
 	for _, v := range indexRsp.Data.Theme_list {
+		fmt.Println("-------------------------------------theme_list--------------------------------------")
 		infoqCrawlerThemeList(v.Id) 
 	}
 }
@@ -183,7 +183,6 @@ func infoqCrawlerThemeList(themeId int) {
 		return
 	}
 
-	fmt.Println("-------------------------------------theme_list-------------------------------------")
 	for _, v := range themeRsp.Data {
 		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
 	}
@@ -233,11 +232,22 @@ func infoqCrawlerGuidRecomList(postData string) {
 		return
 	}
 
-	fmt.Println("-------------------------------------theme_list-------------------------------------")
 	for _, v := range themeRsp.Data {
 		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
 	}
+}
 
+type InfoqDocDetailInfo struct {
+	Uuid			string	`json:"uuid"`
+	Article_title	string	`json:"article_title"`
+	Views			int		`json:"views"`
+	Love			int		`json:"love"`
+	Recommend_list  []InfoqDocSimpleInfo	`json:"recommend_list"`
+}
+
+type InfoqDoc struct {
+	Code int				`json:"code"`
+	Data InfoqDocDetailInfo `json:"data"`
 }
 
 // 文章详情页数据|相关阅读文章列表
@@ -269,7 +279,30 @@ func infoqCrawlerDoc(docId string) {
 	defer rsp.Body.Close()
 
 	body, _ := ioutil.ReadAll(rsp.Body)
-	fmt.Println(string(body))
+	if err != nil {
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		return
+	}
+
+	if json.Valid(body) == false {
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid" : err}).Error("infoqCrawlerIndex")
+		return
+	}
+
+	var docRsp InfoqDoc
+	if err := json.Unmarshal(body, &docRsp); err != nil {
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail" : err}).Error("infoqCrawlerIndex")
+		return
+	}
+
+	if docRsp.Code != 0 {
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error" : docRsp.Code}).Error("infoqCrawlerIndex")
+		return
+	}
+
+	for _, v := range docRsp.Data.Recommend_list {
+		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+	}
 }
 
 func infoqCrawlerStart() {
@@ -297,5 +330,7 @@ func infoqCrawlerStart() {
 	fmt.Println("-------------------------operation------------------------")
 	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":38}`)
 
-	// infoqCrawlerDoc(`RbiqMbpIR9Xl8Nq*QNTO`)
+	// 文章相关阅读
+	fmt.Println("-------------------------doc releate------------------------")
+	infoqCrawlerDoc(`T3yPFdi88*GKZwHR2bPT`)
 }
