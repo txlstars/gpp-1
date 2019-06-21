@@ -14,5 +14,5 @@ create table t_doc_info (
 	create_time timestamp not null default current_timestamp,
 	update_time timestamp not null default current_timestamp on update current_timestamp,
 	primary key(id),
-	primary key(src, docid),
+	constraint uqdocid unique(src, docid);
 );

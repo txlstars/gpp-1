@@ -13,6 +13,10 @@ import (
 	"strconv"
 )
 
+var docIdSet map[string]bool
+
+// var releateDocIdSet []string
+
 func httpProxy(*http.Request) (*url.URL, error) {
 	httpProxyUrl, err := url.Parse("http://web-proxy.tencent.com:8080")
 	if err != nil {
@@ -31,6 +35,8 @@ type InfoqDocSimpleInfo struct {
 	Uuid			string	`json:"uuid"`
 	Article_title	string	`json:"article_title"`
 	Views			int		`json:"views"`
+	Publish_time	int64	`json:"publish_time"`
+	Love			int		`json:"love"`
 }
 
 type InfoqIndexList struct {
@@ -103,6 +109,11 @@ func infoqCrawlerIndexList() {
 
 	fmt.Println("-------------------------------------book_list-------------------------------------")
 	for _, v := range indexRsp.Data.Book_list {
+		if _, ok := docIdSet[v.Uuid]; ok == false {
+			docIdSet[v.Uuid] = true
+			// infoqCrawlerDocAndReleate(v.Uuid)
+		}
+
 		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
 	}
 
@@ -238,10 +249,11 @@ func infoqCrawlerGuidRecomList(postData string) {
 }
 
 type InfoqDocDetailInfo struct {
-	Uuid			string	`json:"uuid"`
-	Article_title	string	`json:"article_title"`
-	Views			int		`json:"views"`
-	Love			int		`json:"love"`
+	Uuid			string					`json:"uuid"`
+	Article_title	string					`json:"article_title"`
+	Views			int						`json:"views"`
+	Love			int						`json:"love"`
+	Publish_time	int64					`json:"publish_time"`
 	Recommend_list  []InfoqDocSimpleInfo	`json:"recommend_list"`
 }
 
@@ -251,7 +263,7 @@ type InfoqDoc struct {
 }
 
 // 文章详情页数据|相关阅读文章列表
-func infoqCrawlerDoc(docId string) {
+func infoqCrawlerDocAndReleate(docId string) {
 	postData := `{"uuid":"` + docId + `"}`
 
 	req, err := http.NewRequest("POST", "https://www.infoq.cn/public/v1/article/getDetail", strings.NewReader(postData))
@@ -300,12 +312,19 @@ func infoqCrawlerDoc(docId string) {
 		return
 	}
 
+	// 详情数据写入DB
+	infoqDocInsertDB(&docRsp.Data, "test")
+
 	for _, v := range docRsp.Data.Recommend_list {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+		fmt.Printf("docid:%s, title:%s, Views:%d, publishtime:%v\n", v.Uuid, v.Article_title, v.Views, v.Publish_time)
 	}
 }
 
+
 func infoqCrawlerStart() {
+	docIdSet = make(map[string]bool)
+	// releateDocIdSet = make([]string)
+
 	// 首页运营数据
 	fmt.Println("-------------------------index op------------------------")
 	infoqCrawlerIndexList()
@@ -332,5 +351,29 @@ func infoqCrawlerStart() {
 
 	// 文章相关阅读
 	fmt.Println("-------------------------doc releate------------------------")
-	infoqCrawlerDoc(`T3yPFdi88*GKZwHR2bPT`)
+	infoqCrawlerDocAndReleate(`T3yPFdi88*GKZwHR2bPT`)
 }
+
+func infoqDocInsertDB(docInfo *InfoqDocDetailInfo, docType string) error {
+	sqlContent := `insert into t_doc_info_test(docid, title, src, type, views, loves, publish_time) values("`
+	sqlContent += docInfo.Uuid + `", "`
+	sqlContent += docInfo.Article_title + `", "`
+	sqlContent += `infoq", "`
+	sqlContent += docType + `", `
+	sqlContent += strconv.Itoa(docInfo.Views) + `, `
+	sqlContent += strconv.Itoa(docInfo.Love) + `, `
+	sqlContent += strconv.FormatInt(docInfo.Publish_time / 1000, 10) + `)`
+
+	fmt.Println(sqlContent)
+
+	return nil
+}
+
+/*
+rows, err := db.Exec(
+
+if err != nil {
+	gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err" : err}).Error("mysql client fail")
+	return
+}
+*/

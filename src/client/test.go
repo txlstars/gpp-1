@@ -9,6 +9,8 @@ import (
 	"github.com/go-redis/redis"
 )
 
+// var db *DB
+
 func mysqlClientTest(ch chan int) {
 	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
 	if err != nil {
@@ -58,6 +60,15 @@ func redisClientTest(ch chan int) {
 }
 
 func main() {
+	// gpp数据库连接代理 
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/gpp")
+	if err != nil {
+		gpplog.GetLogger("client").WithFields(log.Fields{"err" : err}).Error("mysql client open fail")
+		return
+	}
+	defer db.Close()
+
+
 	// ch := make(chan int, 4)
 
 	// go mysqlClientTest(ch)
