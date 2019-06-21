@@ -13,4 +13,6 @@ create table t_doc_info (
 	publish_time timestamp default '1970-01-01 00:00:00',
 	create_time timestamp not null default current_timestamp,
 	update_time timestamp not null default current_timestamp on update current_timestamp,
-	primary key(id) );
+	primary key(id),
+	primary key(src, docid),
+);
