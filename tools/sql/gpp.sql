@@ -24,6 +24,7 @@ create table t_doc_dynamic_info (
 	src varchar(32) not null,
 	views int default 0,
 	loves int default 0,
+	create_time timestamp not null default current_timestamp,
 	update_time timestamp not null default current_timestamp on update current_timestamp,
 	primary key(id),
 	constraint uqdocid unique(src, docid)
