@@ -1,25 +1,15 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
+	_ "database/sql"
+	_ "fmt"
 	"gpplog"
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
-	"github.com/go-redis/redis"
+    "sync"
 )
 
-// var db *DB
-
 func mysqlClientTest(ch chan int) {
-	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
-	if err != nil {
-		gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err" : err}).Error("mysql client fail")
-		return
-	}
-
-	defer db.Close()
-
 	rows, err := db.Query("select User, Host, plugin from user limit 1")
 	if err != nil {
 		gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err" : err}).Error("mysql client fail")
@@ -42,6 +32,7 @@ func mysqlClientTest(ch chan int) {
 	ch <- 1
 }
 
+/*
 func redisClientTest(ch chan int) {
 	client := redis.NewClient(&redis.Options{
 		Addr:		"localhost:6379",
@@ -58,30 +49,14 @@ func redisClientTest(ch chan int) {
 
 	ch <- 1
 }
+*/
 
 func main() {
-	// gpp数据库连接代理 
-	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/gpp")
-	if err != nil {
-		gpplog.GetLogger("client").WithFields(log.Fields{"err" : err}).Error("mysql client open fail")
-		return
-	}
-	defer db.Close()
+    waitGroup := &sync.WaitGroup{}
 
+    waitGroup.Add(2)
+    go storageStart(waitGroup)
+    go infoqCrawlerStart(waitGroup);
 
-	// ch := make(chan int, 4)
-
-	// go mysqlClientTest(ch)
-
-	// go redisClientTest(ch)
-
-	infoqCrawlerStart()
-
-	fmt.Printf("hello world\n")
-
-	/*
-	for i :=0; i < 2; i++ {
-		<-ch
-	}
-	*/
+    waitGroup.Wait()
 }

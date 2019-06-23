@@ -1,16 +1,17 @@
 package main
 
 import (
-	"net/http"
-	"gpplog"
-	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"gpplog"
+	"io/ioutil"
+	"net/http"
 	// "time"
-	"net/url"
-	"strings"
 	"encoding/json"
+	"net/url"
 	"strconv"
+	"strings"
+    "sync"
 )
 
 var docIdSet map[string]bool
@@ -18,51 +19,52 @@ var docIdSet map[string]bool
 // var releateDocIdSet []string
 
 func httpProxy(*http.Request) (*url.URL, error) {
+	return nil, nil
 	httpProxyUrl, err := url.Parse("http://web-proxy.tencent.com:8080")
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"httpProxy err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"httpProxy err": err}).Error("infoqCrawler")
 		return nil, err
 	}
 	return httpProxyUrl, err
 }
 
 type InfoqThemeInfo struct {
-	Id		int		`json:"id"`
-	Name	string	`json:"name"`
+	Id   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 type InfoqDocSimpleInfo struct {
-	Uuid			string	`json:"uuid"`
-	Article_title	string	`json:"article_title"`
-	Views			int		`json:"views"`
-	Publish_time	int64	`json:"publish_time"`
-	Love			int		`json:"love"`
+	Uuid          string `json:"uuid"`
+	Article_title string `json:"article_title"`
+	Views         int    `json:"views"`
+	Publish_time  int64  `json:"publish_time"`
+	Love          int    `json:"love"`
 }
 
 type InfoqIndexList struct {
-	Book_list		[]InfoqDocSimpleInfo	`json:"book_list"`
-	Hot_day_list	[]InfoqDocSimpleInfo	`json:"hot_day_list"`
-	Hot_month_list	[]InfoqDocSimpleInfo	`json:"hot_month_list"`
-	Hot_year_list	[]InfoqDocSimpleInfo	`json:"hot_year_list"`
-	Recommend_list  []InfoqDocSimpleInfo	`json:"recommend_list"`
-	Theme_list		[]InfoqThemeInfo		`json:"theme_list"`
+	Book_list      []InfoqDocSimpleInfo `json:"book_list"`
+	Hot_day_list   []InfoqDocSimpleInfo `json:"hot_day_list"`
+	Hot_month_list []InfoqDocSimpleInfo `json:"hot_month_list"`
+	Hot_year_list  []InfoqDocSimpleInfo `json:"hot_year_list"`
+	Recommend_list []InfoqDocSimpleInfo `json:"recommend_list"`
+	Theme_list     []InfoqThemeInfo     `json:"theme_list"`
 }
 
 type InfoqIndex struct {
-	Code int			`json:"code"`
+	Code int            `json:"code"`
 	Data InfoqIndexList `json:"data"`
 }
 
 type InfoqTheme struct {
-	Code int					`json:"code"`
-	Data []InfoqDocSimpleInfo	`json:"data"`
+	Code int                  `json:"code"`
+	Data []InfoqDocSimpleInfo `json:"data"`
 }
 
 // 首页精选内容|热点|快讯|专题
 func infoqCrawlerIndexList() {
 	req, err := http.NewRequest("GET", "https://www.infoq.cn/public/v1/article/getIndexList", nil)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"NewRequest" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"NewRequest": err}).Error("infoqCrawler")
 		return
 	}
 
@@ -73,37 +75,37 @@ func infoqCrawlerIndexList() {
 	req.Header.Add("Referer", "https://www.infoq.cn/")
 
 	tr := &http.Transport{
-		Proxy: httpProxy,
+		Proxy:              httpProxy,
 		DisableCompression: true,
 	}
 	client := &http.Client{Transport: tr}
 
 	rsp, err := client.Do(req)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err": err}).Error("infoqCrawler")
 		return
 	}
 	defer rsp.Body.Close()
 
 	body, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err": err}).Error("infoqCrawler")
 		return
 	}
 
 	if json.Valid(body) == false {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	var indexRsp InfoqIndex
 	if err := json.Unmarshal(body, &indexRsp); err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	if indexRsp.Code != 0 {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error" : indexRsp.Code}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error": indexRsp.Code}).Error("infoqCrawlerIndex")
 		return
 	}
 
@@ -139,7 +141,7 @@ func infoqCrawlerIndexList() {
 
 	for _, v := range indexRsp.Data.Theme_list {
 		fmt.Println("-------------------------------------theme_list--------------------------------------")
-		infoqCrawlerThemeList(v.Id) 
+		infoqCrawlerThemeList(v.Id)
 	}
 }
 
@@ -148,7 +150,7 @@ func infoqCrawlerThemeList(themeId int) {
 	postData := `{"id":` + strconv.Itoa(themeId) + `}`
 	req, err := http.NewRequest("POST", "https://www.infoq.cn/public/v1/theme/getArtList", strings.NewReader(postData))
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"NewRequest" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"NewRequest": err}).Error("infoqCrawler")
 		return
 	}
 	req.Header.Add("Accept", "application/json, text/plain, */*")
@@ -158,39 +160,39 @@ func infoqCrawlerThemeList(themeId int) {
 	req.Header.Add("Referer", "https://www.infoq.cn/")
 
 	tr := &http.Transport{
-		Proxy: httpProxy,
+		Proxy:              httpProxy,
 		DisableCompression: true,
 	}
 	client := &http.Client{Transport: tr}
 
 	rsp, err := client.Do(req)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err": err}).Error("infoqCrawler")
 		return
 	}
 	defer rsp.Body.Close()
 
 	body, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err": err}).Error("infoqCrawler")
 		return
 	}
 
 	// fmt.Println(string(body))
 
 	if json.Valid(body) == false {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	var themeRsp InfoqTheme
 	if err := json.Unmarshal(body, &themeRsp); err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	if themeRsp.Code != 0 {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error" : themeRsp.Code}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error": themeRsp.Code}).Error("infoqCrawlerIndex")
 		return
 	}
 
@@ -200,7 +202,7 @@ func infoqCrawlerThemeList(themeId int) {
 }
 
 // 首页推荐和垂类tab推荐列表数据
-func infoqCrawlerGuidRecomList(postData string) {
+func infoqCrawlerGuidRecomList(postData string, dataType string) {
 	req, err := http.NewRequest("POST", "https://www.infoq.cn/public/v1/article/getList", strings.NewReader(postData))
 	req.Header.Add("Accept", "application/json, text/plain, */*")
 	req.Header.Add("Accept-Encoding", "gzip, deflate, br")
@@ -209,7 +211,7 @@ func infoqCrawlerGuidRecomList(postData string) {
 	req.Header.Add("Referer", "https://www.infoq.cn/topic/architecture")
 
 	tr := &http.Transport{
-		Proxy: httpProxy,
+		Proxy:              httpProxy,
 		DisableCompression: true,
 	}
 	client := &http.Client{Transport: tr}
@@ -223,42 +225,42 @@ func infoqCrawlerGuidRecomList(postData string) {
 
 	body, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err": err}).Error("infoqCrawler")
 		return
 	}
 
 	if json.Valid(body) == false {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	var themeRsp InfoqTheme
 	if err := json.Unmarshal(body, &themeRsp); err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	if themeRsp.Code != 0 {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error" : themeRsp.Code}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error": themeRsp.Code}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	for _, v := range themeRsp.Data {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+       infoqDocInsertDB(&v, dataType)
 	}
 }
 
 type InfoqDocDetailInfo struct {
-	Uuid			string					`json:"uuid"`
-	Article_title	string					`json:"article_title"`
-	Views			int						`json:"views"`
-	Love			int						`json:"love"`
-	Publish_time	int64					`json:"publish_time"`
-	Recommend_list  []InfoqDocSimpleInfo	`json:"recommend_list"`
+	Uuid           string               `json:"uuid"`
+	Article_title  string               `json:"article_title"`
+	Views          int                  `json:"views"`
+	Love           int                  `json:"love"`
+	Publish_time   int64                `json:"publish_time"`
+	Recommend_list []InfoqDocSimpleInfo `json:"recommend_list"`
 }
 
 type InfoqDoc struct {
-	Code int				`json:"code"`
+	Code int                `json:"code"`
 	Data InfoqDocDetailInfo `json:"data"`
 }
 
@@ -273,107 +275,93 @@ func infoqCrawlerDocAndReleate(docId string) {
 	req.Header.Add("Accept-Language", "zh-CN,zh;q=0.9")
 	req.Header.Add("Referer", "https://www.infoq.cn")
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"infoqCrawlerDoc" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"infoqCrawlerDoc": err}).Error("infoqCrawler")
 		return
 	}
 
 	tr := &http.Transport{
-		Proxy: httpProxy,
+		Proxy:              httpProxy,
 		DisableCompression: true,
 	}
 	client := &http.Client{Transport: tr}
 
 	rsp, err := client.Do(req)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"infoqCrawlerDoc Do" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"infoqCrawlerDoc Do": err}).Error("infoqCrawler")
 		return
 	}
 	defer rsp.Body.Close()
 
 	body, _ := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err" : err}).Error("infoqCrawler")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"err": err}).Error("infoqCrawler")
 		return
 	}
 
 	if json.Valid(body) == false {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json invalid": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	var docRsp InfoqDoc
 	if err := json.Unmarshal(body, &docRsp); err != nil {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail" : err}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"json parse fail": err}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	if docRsp.Code != 0 {
-		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error" : docRsp.Code}).Error("infoqCrawlerIndex")
+		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"server error": docRsp.Code}).Error("infoqCrawlerIndex")
 		return
 	}
 
 	// 详情数据写入DB
-	infoqDocInsertDB(&docRsp.Data, "test")
+	// infoqDocInsertDB(&docRsp.Data, "test")
 
 	for _, v := range docRsp.Data.Recommend_list {
 		fmt.Printf("docid:%s, title:%s, Views:%d, publishtime:%v\n", v.Uuid, v.Article_title, v.Views, v.Publish_time)
 	}
 }
 
-
-func infoqCrawlerStart() {
+func infoqCrawlerStart(parentWaitGroup *sync.WaitGroup) {
 	docIdSet = make(map[string]bool)
-	// releateDocIdSet = make([]string)
 
 	// 首页运营数据
-	fmt.Println("-------------------------index op------------------------")
-	infoqCrawlerIndexList()
+	// fmt.Println("-------------------------index op------------------------")
+	// infoqCrawlerIndexList()
 
 	// 首页推荐列表数据
-	fmt.Println("-------------------------index recom------------------------")
-	infoqCrawlerGuidRecomList(`{"size":12}`)
+	// fmt.Println("-------------------------index recom------------------------")
+	infoqCrawlerGuidRecomList(`{"size":12}`, "index recom")
 
 	// 架构tab
-	fmt.Println("-------------------------architecture------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":8}`)
+	// fmt.Println("-------------------------architecture------------------------")
+	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":8}`, "architecture")
 
 	// 云计算
-	fmt.Println("-------------------------cloud computing ------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":11`)
+	// fmt.Println("-------------------------cloud computing ------------------------")
+	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":11`, "cloud-computing")
 
 	// 前端
-	fmt.Println("-------------------------front end------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":33}`)
+	// fmt.Println("-------------------------front end------------------------")
+	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":33}`, "front-end")
 
 	// 运维
-	fmt.Println("-------------------------operation------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":38}`)
+	// fmt.Println("-------------------------operation------------------------")
+	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":38}`, "operation")
 
 	// 文章相关阅读
-	fmt.Println("-------------------------doc releate------------------------")
-	infoqCrawlerDocAndReleate(`T3yPFdi88*GKZwHR2bPT`)
+	// fmt.Println("-------------------------doc releate------------------------")
+	// infoqCrawlerDocAndReleate(`T3yPFdi88*GKZwHR2bPT`)
 }
 
-func infoqDocInsertDB(docInfo *InfoqDocDetailInfo, docType string) error {
-	sqlContent := `insert into t_doc_info_test(docid, title, src, type, views, loves, publish_time) values("`
-	sqlContent += docInfo.Uuid + `", "`
-	sqlContent += docInfo.Article_title + `", "`
-	sqlContent += `infoq", "`
-	sqlContent += docType + `", `
-	sqlContent += strconv.Itoa(docInfo.Views) + `, `
-	sqlContent += strconv.Itoa(docInfo.Love) + `, `
-	sqlContent += strconv.FormatInt(docInfo.Publish_time / 1000, 10) + `)`
-
-	fmt.Println(sqlContent)
-
-	return nil
+func infoqDocInsertDB(docInfo *InfoqDocSimpleInfo, docType string) {
+    docStaticInfo := &DocStaticInfo{
+        docid:docInfo.Uuid,
+        src:"infoq",
+        title:docInfo.Article_title,
+        typex:docType,
+        pageUrl: "https://www.infoq.cn/article/" + docInfo.Uuid,
+        // publishTime:(docInfo.Publish_time / 1000),
+    }
+    docStaticInfoTask <- docStaticInfo
 }
-
-/*
-rows, err := db.Exec(
-
-if err != nil {
-	gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err" : err}).Error("mysql client fail")
-	return
-}
-*/
