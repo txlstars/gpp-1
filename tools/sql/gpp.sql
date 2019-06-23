@@ -14,7 +14,7 @@ create table t_doc_info (
 	create_time timestamp not null default current_timestamp,
 	update_time timestamp not null default current_timestamp on update current_timestamp,
 	primary key(id),
-	constraint uqdocid unique(src, docid);
+	constraint uqdocid unique(src, docid)
 ) default charset = utf8;
 
 # 创建doc动态信息表
@@ -26,5 +26,5 @@ create table t_doc_dynamic_info (
 	loves int default 0,
 	update_time timestamp not null default current_timestamp on update current_timestamp,
 	primary key(id),
-	constraint uqdocid unique(src, docid);
+	constraint uqdocid unique(src, docid)
 ) default charset = utf8;
