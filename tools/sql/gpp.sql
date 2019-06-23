@@ -13,7 +13,7 @@ create table t_doc_info (
 	update_time timestamp not null default current_timestamp on update current_timestamp,
 	primary key(id),
 	constraint uqdocid unique(src, docid);
-);
+) default charset = utf8;
 
 # 创建doc动态信息表
 create table t_doc_info (

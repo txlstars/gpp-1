@@ -119,28 +119,23 @@ func infoqCrawlerIndexList() {
 		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
 	}
 
-	fmt.Println("-----------------------------------hot_day_list------------------------------------")
 	for _, v := range indexRsp.Data.Hot_day_list {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+        infoqDocInsertDB(&v, "hot_day")
 	}
 
-	fmt.Println("-----------------------------------hot_month_list-----------------------------------")
 	for _, v := range indexRsp.Data.Hot_month_list {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+        infoqDocInsertDB(&v, "hot_month")
 	}
 
-	fmt.Println("-----------------------------------hot_year_list------------------------------------")
 	for _, v := range indexRsp.Data.Hot_year_list {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+        infoqDocInsertDB(&v, "hot_year")
 	}
 
-	fmt.Println("-----------------------------------recommend_list------------------------------------")
 	for _, v := range indexRsp.Data.Recommend_list {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+        infoqDocInsertDB(&v, "high_quality")
 	}
 
 	for _, v := range indexRsp.Data.Theme_list {
-		fmt.Println("-------------------------------------theme_list--------------------------------------")
 		infoqCrawlerThemeList(v.Id)
 	}
 }
@@ -197,7 +192,7 @@ func infoqCrawlerThemeList(themeId int) {
 	}
 
 	for _, v := range themeRsp.Data {
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+        infoqDocInsertDB(&v, "theme")
 	}
 }
 
@@ -327,7 +322,7 @@ func infoqCrawlerStart(parentWaitGroup *sync.WaitGroup) {
 
 	// 首页运营数据
 	// fmt.Println("-------------------------index op------------------------")
-	// infoqCrawlerIndexList()
+	infoqCrawlerIndexList()
 
 	// 首页推荐列表数据
 	// fmt.Println("-------------------------index recom------------------------")
@@ -361,7 +356,7 @@ func infoqDocInsertDB(docInfo *InfoqDocSimpleInfo, docType string) {
         title:docInfo.Article_title,
         typex:docType,
         pageUrl: "https://www.infoq.cn/article/" + docInfo.Uuid,
-        // publishTime:(docInfo.Publish_time / 1000),
+        publishTime:uint32(docInfo.Publish_time / 1000),
     }
     docStaticInfoTask <- docStaticInfo
 }
