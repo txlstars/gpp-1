@@ -3,29 +3,29 @@ package main
 import (
 	_ "database/sql"
 	_ "fmt"
-	"gpplog"
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
-    "sync"
+	"gpplog"
+	"sync"
 )
 
 func mysqlClientTest(ch chan int) {
 	rows, err := db.Query("select User, Host, plugin from user limit 1")
 	if err != nil {
-		gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err" : err}).Error("mysql client fail")
+		gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err": err}).Error("mysql client fail")
 		return
 	}
 
 	for rows.Next() {
 		var user, host, plugin string
 		if err := rows.Scan(&user, &host, &plugin); err != nil {
-			gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err" : err}).Error("mysql client fail")
+			gpplog.GetLogger("mysql_client").WithFields(log.Fields{"err": err}).Error("mysql client fail")
 			continue
 		}
 		gpplog.GetLogger("mysql_client").WithFields(log.Fields{
-			"user" : user,
-			"host" : host,
-			"plugin" : plugin,
+			"user":   user,
+			"host":   host,
+			"plugin": plugin,
 		}).Info("mysql client succ")
 	}
 
@@ -52,11 +52,11 @@ func redisClientTest(ch chan int) {
 */
 
 func main() {
-    waitGroup := &sync.WaitGroup{}
+	waitGroup := &sync.WaitGroup{}
 
-    waitGroup.Add(2)
-    go storageStart(waitGroup)
-    go infoqCrawlerStart(waitGroup);
+	waitGroup.Add(2)
+	go storageStart(waitGroup)
+	go infoqCrawlerStart(waitGroup)
 
-    waitGroup.Wait()
+	waitGroup.Wait()
 }

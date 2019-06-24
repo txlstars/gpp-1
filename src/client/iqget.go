@@ -6,20 +6,16 @@ import (
 	"gpplog"
 	"io/ioutil"
 	"net/http"
-	// "time"
+	"time"
 	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
-    "sync"
+	"sync"
 )
 
-var docIdSet map[string]bool
-
-// var releateDocIdSet []string
-
 func httpProxy(*http.Request) (*url.URL, error) {
-	return nil, nil
+	// return nil, nil
 	httpProxyUrl, err := url.Parse("http://web-proxy.tencent.com:8080")
 	if err != nil {
 		gpplog.GetLogger("infoq").WithFields(logrus.Fields{"httpProxy err": err}).Error("infoqCrawler")
@@ -34,11 +30,12 @@ type InfoqThemeInfo struct {
 }
 
 type InfoqDocSimpleInfo struct {
-	Uuid          string `json:"uuid"`
-	Article_title string `json:"article_title"`
-	Views         int    `json:"views"`
-	Publish_time  int64  `json:"publish_time"`
-	Love          int    `json:"love"`
+	Uuid			string `json:"uuid"`
+	Article_title	string `json:"article_title"`
+	Article_summary string `json:"article_summary"`
+	Views			int    `json:"views"`
+	Publish_time	int64  `json:"publish_time"`
+	Love			int    `json:"love"`
 }
 
 type InfoqIndexList struct {
@@ -109,30 +106,24 @@ func infoqCrawlerIndexList() {
 		return
 	}
 
-	fmt.Println("-------------------------------------book_list-------------------------------------")
 	for _, v := range indexRsp.Data.Book_list {
-		if _, ok := docIdSet[v.Uuid]; ok == false {
-			docIdSet[v.Uuid] = true
-			// infoqCrawlerDocAndReleate(v.Uuid)
-		}
-
-		fmt.Printf("docid:%s, title:%s, Views:%d\n", v.Uuid, v.Article_title, v.Views)
+		infoqDocInsertDB(&v, "book_list")
 	}
 
 	for _, v := range indexRsp.Data.Hot_day_list {
-        infoqDocInsertDB(&v, "hot_day")
+		infoqDocInsertDB(&v, "hot_day")
 	}
 
 	for _, v := range indexRsp.Data.Hot_month_list {
-        infoqDocInsertDB(&v, "hot_month")
+		infoqDocInsertDB(&v, "hot_month")
 	}
 
 	for _, v := range indexRsp.Data.Hot_year_list {
-        infoqDocInsertDB(&v, "hot_year")
+		infoqDocInsertDB(&v, "hot_year")
 	}
 
 	for _, v := range indexRsp.Data.Recommend_list {
-        infoqDocInsertDB(&v, "high_quality")
+		infoqDocInsertDB(&v, "high_quality")
 	}
 
 	for _, v := range indexRsp.Data.Theme_list {
@@ -192,7 +183,7 @@ func infoqCrawlerThemeList(themeId int) {
 	}
 
 	for _, v := range themeRsp.Data {
-        infoqDocInsertDB(&v, "theme")
+		infoqDocInsertDB(&v, "theme")
 	}
 }
 
@@ -241,7 +232,7 @@ func infoqCrawlerGuidRecomList(postData string, dataType string) {
 	}
 
 	for _, v := range themeRsp.Data {
-       infoqDocInsertDB(&v, dataType)
+		infoqDocInsertDB(&v, dataType)
 	}
 }
 
@@ -318,45 +309,50 @@ func infoqCrawlerDocAndReleate(docId string) {
 }
 
 func infoqCrawlerStart(parentWaitGroup *sync.WaitGroup) {
-	docIdSet = make(map[string]bool)
+	defer parentWaitGroup.Done()
 
-	// 首页运营数据
-	// fmt.Println("-------------------------index op------------------------")
-	infoqCrawlerIndexList()
+	for ;; {
+		// 首页运营数据
+		// fmt.Println("-------------------------index op------------------------")
+		infoqCrawlerIndexList()
 
-	// 首页推荐列表数据
-	// fmt.Println("-------------------------index recom------------------------")
-	infoqCrawlerGuidRecomList(`{"size":12}`, "index recom")
+		// 首页推荐列表数据
+		// fmt.Println("-------------------------index recom------------------------")
+		infoqCrawlerGuidRecomList(`{"size":30}`, "index recom")
 
-	// 架构tab
-	// fmt.Println("-------------------------architecture------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":8}`, "architecture")
+		// 架构tab
+		// fmt.Println("-------------------------architecture------------------------")
+		infoqCrawlerGuidRecomList(`{"type":1,"size":30,"id":8}`, "architecture")
 
-	// 云计算
-	// fmt.Println("-------------------------cloud computing ------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":11`, "cloud-computing")
+		// 云计算
+		// fmt.Println("-------------------------cloud computing ------------------------")
+		infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":11`, "cloud-computing")
 
-	// 前端
-	// fmt.Println("-------------------------front end------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":33}`, "front-end")
+		// 前端
+		// fmt.Println("-------------------------front end------------------------")
+		infoqCrawlerGuidRecomList(`{"type":1,"size":30,"id":33}`, "front-end")
 
-	// 运维
-	// fmt.Println("-------------------------operation------------------------")
-	infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":38}`, "operation")
+		// 运维
+		// fmt.Println("-------------------------operation------------------------")
+		infoqCrawlerGuidRecomList(`{"type":1,"size":12,"id":38}`, "operation")
 
-	// 文章相关阅读
-	// fmt.Println("-------------------------doc releate------------------------")
-	// infoqCrawlerDocAndReleate(`T3yPFdi88*GKZwHR2bPT`)
+		// 文章相关阅读
+		// fmt.Println("-------------------------doc releate------------------------")
+		// infoqCrawlerDocAndReleate(`T3yPFdi88*GKZwHR2bPT`)
+
+		time.Sleep(12 * time.Hour)
+	}
 }
 
 func infoqDocInsertDB(docInfo *InfoqDocSimpleInfo, docType string) {
-    docStaticInfo := &DocStaticInfo{
-        docid:docInfo.Uuid,
-        src:"infoq",
-        title:docInfo.Article_title,
-        typex:docType,
-        pageUrl: "https://www.infoq.cn/article/" + docInfo.Uuid,
-        publishTime:uint32(docInfo.Publish_time / 1000),
-    }
-    docStaticInfoTask <- docStaticInfo
+	docStaticInfo := &DocStaticInfo{
+		docid:       docInfo.Uuid,
+		src:         "infoq",
+		title:       docInfo.Article_title,
+		summary:	 docInfo.Article_summary,
+		typex:       docType,
+		pageUrl:     "https://www.infoq.cn/article/" + docInfo.Uuid,
+		publishTime: uint32(docInfo.Publish_time / 1000),
+	}
+	docStaticInfoTask <- docStaticInfo
 }
